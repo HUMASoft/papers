@@ -6,6 +6,7 @@
 #include "math.h"
 
 #include "SerialArduino.h"
+#include "imu3dmgx510.h"
 
 #include "fcontrol.h"
 #include "IPlot.h"
@@ -26,7 +27,7 @@ long AdaptiveStep(double target, double time);
 int main (){
 
     //--sensor--
-    SerialArduino imu;
+//    SerialArduino imu;
     double imuIncli=0,filtIncli=0,imuOrien,filtIncliOld=0;
     SystemBlock imuFilter(0.09516,0,- 0.9048,1); //w=5
 
@@ -42,6 +43,8 @@ int main (){
     //Samplinfg time
     double dts=0.025; //
     SamplingTime Ts(dts);
+
+    IMU3DMGX510 imu("/dev/ttyUSB0",long(1/dts));
 
     /// System identification
     double wf=1;
@@ -84,9 +87,9 @@ int main (){
     //  data << "Controller PID" << " , " << " 0.1,0.05,0,dts "<< endl;
 
     //m1 setup
-    SocketCanPort pm31("can1");
+    SocketCanPort pm31("can0");
     CiA402SetupData sd31(2048,24,0.001, 0.144, 20);
-    CiA402Device m1 (31, &pm31, &sd31);
+    CiA402Device m1 (1, &pm31, &sd31);
     m1.Reset();
     m1.SwitchOn();
     //    m1.SetupPositionMode(10,10);
@@ -100,7 +103,7 @@ int main (){
     //tilt sensor initialization
     for (double t=0; t<6; t+=10*dts)
     {
-        if (imu.readSensor(imuIncli,imuOrien)>=0) break;
+        if (imu.GetIncliOri(imuIncli,imuOrien)>=0) break;
         cout << "Initializing sensor! " ;
 
     }
@@ -123,7 +126,7 @@ int main (){
     for (double t=0;t<tinit; t+=dts)
     {
         psr=+5*( 1+0.5*( sin(wgc*t) + sin(10*wgc*t) ) + 0.1*(0+(rand() % 10)-5) ); //pseudorandom
-        if (imu.readSensor(imuIncli,imuOrien) <0)
+        if (imu.GetIncliOri(imuIncli,imuOrien) <0)
         {
             cout << "Initializing sensor! ";
             //Sensor error, do nothing.
@@ -157,7 +160,7 @@ int main (){
         sysdatamp << t << ", " << smag << ", " << (sphi) <<  endl;
         timeresp << t << ", " << filtIncli << ", " << csf << ", " << m1.GetPosition() ;
         timeresp << ", " << imuIncli<< ", " << cs << ", " << m1.GetVelocity()  <<  endl;
-
+//        cout << ", " << imuIncli<< ", " << cs << ", " << m1.GetVelocity()  <<  endl;
         sysdatanum << t;
         sysdatanum << ", " << num.back();
         for (int i=num.size()-1; i>=0; i--)
@@ -190,8 +193,8 @@ int main (){
 
 
     incli=15; //initial incli
-    double interval=30; //in seconds
-    double nrep=1;
+    double interval=10; //in seconds
+    double nrep=5;
 
     for (long rep=0;rep<nrep;rep++)
     {
@@ -218,7 +221,7 @@ int main (){
 
         ///read sensor
         filtIncliOld=imuIncli;
-        if (imu.readSensor(imuIncli,imuOrien) <0)
+        if (imu.GetIncliOri(imuIncli,imuOrien) <0)
         {
             cout << "Sensor error! ";
             //Sensor error, do nothing.
